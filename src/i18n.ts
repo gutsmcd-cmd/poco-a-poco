@@ -76,6 +76,10 @@ const ja = {
   today: '今日',
   tomorrow: '明日',
   inDays: (n: number) => `${n}日後`,
+  bubbleLines: ['今日も少しずつ♪', 'いっしょにがんばろう！', 'ゆっくりでいいよ♪', '会えてうれしいワン！'],
+  cheer: '¡Muy bien!',
+  comfort: '大丈夫！',
+  paceBubble: 'マイペースでOK♪',
 };
 
 type Dict = typeof ja;
@@ -156,6 +160,10 @@ const en: Dict = {
   today: 'today',
   tomorrow: 'tomorrow',
   inDays: (n: number) => `in ${n} days`,
+  bubbleLines: ['A little every day ♪', "Let's learn together!", 'Take it easy ♪', 'Happy to see you! Woof!'],
+  cheer: '¡Muy bien!',
+  comfort: 'No worries!',
+  paceBubble: 'Your own pace ♪',
 };
 
 const dicts: Record<Lang, Dict> = { ja, en };

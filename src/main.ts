@@ -14,6 +14,7 @@ import { t, lang, setLang } from './i18n';
 import * as store from './store';
 import { initSpeech, speak, voiceInfo, supported as speechSupported } from './speech';
 import { lessonQuiz, reviewQuiz, type Question } from './quiz';
+import { corgiImg, pick, resetPicks, CORGI_SETS } from './corgi';
 
 registerSW({ immediate: true });
 
@@ -52,6 +53,28 @@ function relDay(ts: number): string {
   if (n <= 0) return t().today;
   if (n === 1) return t().tomorrow;
   return t().inDays(n);
+}
+
+/** Spanish greeting for the time of day — a tiny free lesson every time the app opens. */
+function greetingEs(): string {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 12) return '¡Buenos días!';
+  if (h >= 12 && h < 20) return '¡Buenas tardes!';
+  return '¡Buenas noches!';
+}
+
+/** Page header with the corgi mascot and a small speech bubble. */
+function mascotHeader(title: string, sub: string, bubbleEs: string, bubbleSub: string, slot: string): string {
+  return `<header class="top top-mascot">
+    <div class="top-titles"><h1>${esc(title)}</h1>${sub ? `<p class="sub">${esc(sub)}</p>` : ''}</div>
+    <div class="bubble"><b>${esc(bubbleEs)}</b>${bubbleSub ? `<span>${esc(bubbleSub)}</span>` : ''}</div>
+    <div class="mascot">${corgiImg(pick(slot, CORGI_SETS.all), 104, 'pop')}</div>
+  </header>`;
+}
+
+/** Friendly empty state: a corgi next to a short message. */
+function emptyState(text: string, slot: string): string {
+  return `<div class="empty">${corgiImg(pick(slot, CORGI_SETS.calm), 72)}<p>${esc(text)}</p></div>`;
 }
 
 const fold = (s: string) =>
@@ -138,6 +161,7 @@ function go(hash: string): void {
 }
 
 window.addEventListener('hashchange', () => {
+  resetPicks();
   render();
   window.scrollTo(0, 0);
 });
@@ -183,11 +207,11 @@ function viewHome(): string {
   if (due > 0) {
     reviewBlock = `<button class="btn btn-primary btn-big" data-act="review">🔁 ${esc(T.reviewNow)} (${due})</button>`;
   } else if (learned === 0) {
-    reviewBlock = `<p class="muted center">${esc(T.reviewEmpty)}</p>`;
+    reviewBlock = emptyState(T.reviewEmpty, 'empty-review');
   } else {
     const nd = store.nextDue();
     reviewBlock = `<button class="btn btn-soft btn-big" disabled>🔁 ${esc(T.reviewNow)} (0)</button>
-      <p class="muted center">${esc(T.reviewNone)}${nd ? ' · ' + esc(T.nextReviewAt(relDay(nd))) : ''}</p>`;
+      ${emptyState(`${T.reviewNone}${nd ? ' · ' + T.nextReviewAt(relDay(nd)) : ''}`, 'empty-review')}`;
   }
   let nextBlock = '';
   if (next) {
@@ -196,7 +220,7 @@ function viewHome(): string {
       ▶ ${esc(store.state.lessonsDone.length ? T.continue : T.startHere)}
       <small>${u.emoji} ${esc(enMode() ? u.en : u.ja)} · ${esc(T.lesson)} ${next.index + 1}</small></button>`;
   } else {
-    nextBlock = `<p class="center">🎉 ${esc(T.allDone)}</p>`;
+    nextBlock = `<div class="empty">${corgiImg(pick('all-done', CORGI_SETS.cheer), 72, 'hop')}<p>🎉 ${esc(T.allDone)}</p></div>`;
   }
 
   const units = UNITS.map((u, ui) => {
@@ -223,7 +247,7 @@ function viewHome(): string {
     </section>`;
   }).join('');
 
-  return `<header class="top"><h1>${esc(T.appName)}</h1><p class="sub">${esc(T.appSub)}</p></header>
+  return `${mascotHeader(T.appName, T.appSub, greetingEs(), pick('bubble', T.bubbleLines), 'home')}
     <main class="page">
       ${voiceNotice()}
       <div class="stack">${reviewBlock}${nextBlock}</div>
@@ -327,11 +351,19 @@ function viewQuestion(s: Session): string {
     const item = q.item;
     const sentence = q.kind === 'build' ? q.sentence : item.es;
     const meaning = q.kind === 'build' ? meaningHtml(q.meaning, q.meaningEn) : meaningHtml(item.ja, item.en);
+    // Correct: the excited corgi hops. Wrong: a gentle corgi says it's okay.
+    const dog = a.correct ? 'excited' : pick(`comfort:${s.qIdx}`, CORGI_SETS.comfort);
     footer = `<footer class="actionbar feedback ${a.correct ? 'ok' : 'ng'}">
+      <div class="fb-row">
+      <div class="fb-corgi ${a.correct ? 'hop' : 'sway'}">
+        <span class="fb-bubble">${esc(a.correct ? T.cheer : T.comfort)}</span>
+        ${corgiImg(dog, 76)}
+      </div>
       <div class="fb-text">
         <strong>${a.correct ? '✓ ' + esc(T.correct) : '✗ ' + esc(T.wrong)}</strong>
         <div class="fb-answer">${a.correct ? '' : esc(T.answerIs)}<b>${esc(sentence)}</b> ${speakBtn(sentence, { cls: 'speak-sm' })}</div>
         <div class="fb-meaning">${meaning}</div>
+      </div>
       </div>
       <button class="btn btn-primary" data-act="next-q">${esc(T.next)} →</button>
     </footer>`;
@@ -356,7 +388,15 @@ function viewDone(s: Session): string {
       ? `<p>${esc(T.newWords(s.items.length))}</p>`
       : '';
   return `<main class="page done">
-    <div class="done-emoji">${s.mode === 'lesson' ? '🎉' : '🌟'}</div>
+    <div class="done-hero">
+      <span class="heart" style="--x:-86px;--d:0s">♥</span>
+      <span class="heart" style="--x:78px;--d:.5s">♥</span>
+      <span class="heart" style="--x:-60px;--d:1.1s">♥</span>
+      <span class="heart" style="--x:96px;--d:1.6s">♥</span>
+      <span class="heart" style="--x:-100px;--d:2.1s">♥</span>
+      <span class="fb-bubble done-bubble">${s.mode === 'lesson' ? '¡Genial!' : '¡Fantástico!'}</span>
+      ${corgiImg(pick('done', CORGI_SETS.cheer), 180, 'celebrate')}
+    </div>
     <h2>${esc(s.mode === 'lesson' ? T.lessonDone : T.reviewDone)}</h2>
     <p class="score">${esc(T.scoreLine(first, s.total))}</p>
     ${extra}
@@ -401,7 +441,7 @@ function phraseList(): string {
         )
         .join('')}</ul></section>`;
   }).join('');
-  return out || `<p class="muted center">${esc(t().noResults)}</p>`;
+  return out || `<div class="empty empty-col">${corgiImg(pick('no-results', ['tongue', 'lookup'] as const), 96)}<p>${esc(t().noResults)}</p></div>`;
 }
 
 function viewPhrases(): string {
@@ -427,7 +467,7 @@ function viewProgress(): string {
       <div class="bar small"><div class="bar-fill" style="width:${(d / ls.length) * 100}%"></div></div>
       <span class="muted">${d}/${ls.length}</span></li>`;
   }).join('');
-  return `<header class="top"><h1>${esc(T.progressTitle)}</h1><p class="sub">${esc(T.noPressure)}</p></header>
+  return `${mascotHeader(T.progressTitle, T.noPressure, '¡Poco a poco!', T.paceBubble, 'progress')}
     <main class="page">
       <div class="stats">
         <div class="stat"><b>${done}<small>/${total}</small></b><span>${esc(T.lessonsDone)}</span></div>
@@ -475,7 +515,7 @@ function viewSettings(): string {
       <section class="card">
         <h3>${esc(T.about)}</h3>
         <p class="muted">${esc(T.aboutText)}</p>
-        <p class="muted small">v1.0 · ¡Buen viaje! 🇪🇸</p>
+        <p class="muted small">v1.1 · ¡Buen viaje! 🇪🇸🐾</p>
       </section>
     </main>${nav('settings')}`;
 }
